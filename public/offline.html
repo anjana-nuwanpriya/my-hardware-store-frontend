@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Offline - Hardware Shop</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .container {
+      background: white;
+      border-radius: 20px;
+      padding: 40px;
+      max-width: 500px;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+    .icon {
+      width: 100px;
+      height: 100px;
+      background: #f3f4f6;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 30px;
+      font-size: 50px;
+    }
+    h1 {
+      color: #1f2937;
+      margin-bottom: 15px;
+      font-size: 28px;
+    }
+    p {
+      color: #6b7280;
+      line-height: 1.6;
+      margin-bottom: 30px;
+    }
+    .features {
+      text-align: left;
+      background: #f9fafb;
+      padding: 20px;
+      border-radius: 10px;
+      margin-bottom: 30px;
+    }
+    .feature {
+      display: flex;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+    .feature:last-child {
+      margin-bottom: 0;
+    }
+    .feature-icon {
+      width: 24px;
+      height: 24px;
+      background: #10b981;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+      margin-right: 15px;
+      flex-shrink: 0;
+    }
+    .button {
+      background: #667eea;
+      color: white;
+      border: none;
+      padding: 15px 30px;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    .button:hover {
+      background: #5568d3;
+    }
+    .status {
+      margin-top: 20px;
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+    .status.offline {
+      background: #fef3c7;
+      color: #92400e;
+    }
+    .status.online {
+      background: #d1fae5;
+      color: #065f46;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="icon">📡</div>
+    <h1>You're Offline</h1>
+    <p>Don't worry! The Hardware Shop system works offline. You can continue managing your business without interruption.</p>
+    
+    <div class="features">
+      <div class="feature">
+        <div class="feature-icon">✓</div>
+        <div>Complete sales transactions offline</div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">✓</div>
+        <div>Search products from local cache</div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">✓</div>
+        <div>Auto-sync when connection returns</div>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">✓</div>
+        <div>Print receipts and manage inventory</div>
+      </div>
+    </div>
+
+    <button class="button" onclick="window.location.href='/'">Go to POS System</button>
+
+    <div class="status offline" id="status">
+      ⚠️ Currently offline - Your changes will sync automatically
+    </div>
+  </div>
+
+  <script>
+    function updateStatus() {
+      const status = document.getElementById('status');
+      if (navigator.onLine) {
+        status.className = 'status online';
+        status.textContent = '✅ Back online! Syncing data...';
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 2000);
+      } else {
+        status.className = 'status offline';
+        status.textContent = '⚠️ Currently offline - Your changes will sync automatically';
+      }
+    }
+
+    window.addEventListener('online', updateStatus);
+    window.addEventListener('offline', updateStatus);
+    updateStatus();
+  </script>
+</body>
+</html>
