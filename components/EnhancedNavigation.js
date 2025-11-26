@@ -69,54 +69,34 @@ export default function EnhancedNavigation() {
 
   const isActive = (path) => pathname === path;
 
-  // Main Navigation Items
-  const mainNavItems = [
+  // Masters Section - Now includes Dashboard, POS, Inventory
+  const mastersItems = [
     { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { name: 'Point of Sale', path: '/pos', icon: ShoppingCart },
     { name: 'Inventory', path: '/inventory', icon: Package },
-    { name: 'Customers', path: '/customers', icon: Users },
-  ];
-
-  // Masters Section - Complete list from screenshot
-  const mastersItems = [
     { name: 'Supplier', path: '/suppliers', icon: Users },
     { name: 'Customer', path: '/customers', icon: Users },
     { name: 'Stores', path: '/stores', icon: Store },
-    { name: 'Department', path: '/departments', icon: Building2 },
     { name: 'Category', path: '/categories', icon: FolderTree },
-    { name: 'Brand', path: '/brands', icon: Tag },
-    { name: 'Made', path: '/made', icon: Factory },
-    { name: 'Colour', path: '/colours', icon: Palette },
-    { name: 'Size', path: '/sizes', icon: Ruler },
-    { name: 'Generic', path: '/generic', icon: Pill },
-    { name: 'Item Details', path: '/item-details', icon: FileStack },
-    { name: 'Production Template', path: '/production-template', icon: Factory },
   ];
 
-  // Transaction Section - Complete list from screenshot
+  // Transaction Section - Only specified items
   const transactionItems = [
     { name: 'Supplier OP Balance', path: '/supplier-op-balance', icon: Banknote },
     { name: 'Customer OP Balance', path: '/customer-op-balance', icon: Wallet },
     { name: 'Opening Stock Entry', path: '/opening-stock', icon: BoxIcon },
-    { name: 'Pos Billing 2', path: '/pos-billing-2', icon: Receipt },
     { name: 'Wholesale Sales', path: '/wholesale', icon: ShoppingBag },
     { name: 'Quotation', path: '/quotation', icon: FileEdit },
     { name: 'Item Dispatch Note', path: '/dispatch-note', icon: FileOutput },
     { name: 'Purchase Order', path: '/purchase-orders', icon: ClipboardList },
     { name: 'Purchase(GRN)', path: '/purchase-grn', icon: BoxIcon },
-    { name: 'Production', path: '/production', icon: Factory },
     { name: 'Purchase Return', path: '/purchase-return', icon: RotateCcw },
     { name: 'Supplier Payments', path: '/supplier-payments', icon: CreditCard },
-    { name: 'Supplier Debit Note', path: '/supplier-debit', icon: FileEdit },
     { name: 'Sales', path: '/sales', icon: TrendingUp },
-    { name: 'Internal Sale New', path: '/internal-sale-new', icon: ShoppingCart },
-    { name: 'Internal Sale', path: '/internal-sale', icon: ShoppingCart },
     { name: 'Sales Return', path: '/returns', icon: RotateCcw },
     { name: 'Sales Return (Whole Sales)', path: '/sales-return-whole', icon: RotateCcw },
     { name: 'Stock Adjustment', path: '/stock-adjustment', icon: ArrowDownUp },
     { name: 'Customer Payment', path: '/customer-payment', icon: CreditCard },
-    { name: 'Customer Credit note', path: '/customer-credit', icon: FileEdit },
-    { name: 'Payment Voucher', path: '/payment-voucher', icon: Receipt },
     { name: 'Petty Cash Voucher', path: '/petty-cash', icon: Wallet },
     { name: 'General Receipts', path: '/general-receipts', icon: Receipt },
     { name: 'Bank Entries', path: '/bank-entries', icon: Banknote },
@@ -158,27 +138,6 @@ export default function EnhancedNavigation() {
             Hardware Shop
           </h1>
           <p className="text-xs text-center text-gray-400 mt-1">Management System</p>
-        </div>
-
-        {/* Main Navigation */}
-        <div className="p-2">
-          {mainNavItems.map((item) => (
-            <button
-              key={item.path}
-              onClick={() => {
-                router.push(item.path);
-                setIsOpen(false);
-              }}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg mb-1 transition-all ${
-                isActive(item.path)
-                  ? 'bg-gradient-to-r from-blue-600 to-purple-600 shadow-lg scale-105'
-                  : 'hover:bg-gray-700'
-              }`}
-            >
-              <item.icon className="w-5 h-5" />
-              <span className="text-sm font-medium">{item.name}</span>
-            </button>
-          ))}
         </div>
 
         {/* Masters Section */}
