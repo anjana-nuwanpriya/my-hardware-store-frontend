@@ -1,18 +1,20 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Search, Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import api from '@/lib/api';
 import EnhancedNavigation from '@/components/EnhancedNavigation';
 
-export default function OpeningStockPage() {
+export default function SalesRetailPage() {
   const [formData, setFormData] = useState({
-    entry_date: new Date().toISOString().split('T')[0],
-    ref_number: '',
+    sale_date: new Date().toISOString().split('T')[0],
+    invoice_number: '',
+    customer_id: '',
     store_id: '',
-    supplier_id: '',
     description: '',
-    employee_id: ''
+    employee_id: '',
+    payment_method: 'cash',
+    payment_status: 'paid'
   });
 
   const [items, setItems] = useState([
@@ -22,7 +24,7 @@ export default function OpeningStockPage() {
       item_name: '', 
       batch_no: '', 
       quantity: '', 
-      cost_price: '', 
+      unit_price: '', 
       discount_percent: '0', 
       discount_value: '0', 
       net_value: '0',
@@ -33,7 +35,7 @@ export default function OpeningStockPage() {
   const [dropdowns, setDropdowns] = useState({
     allItems: [],
     stores: [],
-    suppliers: [],
+    customers: [],
     employees: []
   });
 
@@ -46,30 +48,28 @@ export default function OpeningStockPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Fetch dropdowns and ref number
   useEffect(() => {
     fetchDropdowns();
-    fetchNextRefNumber();
+    fetchNextInvoiceNumber();
   }, []);
 
-  // Calculate totals when items change
   useEffect(() => {
     calculateTotals();
   }, [items]);
 
   const fetchDropdowns = async () => {
     try {
-      const [itemsRes, storesRes, suppliersRes, employeesRes] = await Promise.all([
+      const [itemsRes, storesRes, customersRes, employeesRes] = await Promise.all([
         api.get('/items'),
         api.get('/stores'),
-        api.get('/suppliers'),
+        api.get('/customers'),
         api.get('/employees')
       ]);
 
       setDropdowns({
         allItems: itemsRes.data.items || [],
         stores: storesRes.data.stores || [],
-        suppliers: suppliersRes.data.suppliers || [],
+        customers: customersRes.data.customers || [],
         employees: employeesRes.data.employees || []
       });
     } catch (error) {
@@ -77,12 +77,12 @@ export default function OpeningStockPage() {
     }
   };
 
-  const fetchNextRefNumber = async () => {
+  const fetchNextInvoiceNumber = async () => {
     try {
-      const res = await api.get('/opening-stock/next/ref-number');
-      setFormData(prev => ({ ...prev, ref_number: res.data.refNumber }));
+      const res = await api.get('/sales-retail/next/invoice-number');
+      setFormData(prev => ({ ...prev, invoice_number: res.data.invoiceNumber }));
     } catch (error) {
-      console.error('Error fetching ref number:', error);
+      console.error('Error fetching invoice number:', error);
     }
   };
 
@@ -95,7 +95,7 @@ export default function OpeningStockPage() {
         item_id: selectedItem.id,
         code: selectedItem.code,
         item_name: selectedItem.name,
-        cost_price: selectedItem.cost_price || '0',
+        unit_price: selectedItem.retail_price || '0',
         current_stock: selectedItem.stock_quantity || '0'
       };
       setItems(newItems);
@@ -105,6 +105,13 @@ export default function OpeningStockPage() {
 
   const handleQuantityChange = (index, quantity) => {
     const newItems = [...items];
+    const currentStock = parseFloat(newItems[index].current_stock || 0);
+    
+    if (parseFloat(quantity) > currentStock) {
+      alert(`Insufficient stock! Available: ${currentStock}`);
+      return;
+    }
+    
     newItems[index].quantity = quantity;
     setItems(newItems);
     calculateLineTotal(index, newItems);
@@ -114,7 +121,7 @@ export default function OpeningStockPage() {
     const newItems = [...items];
     newItems[index].discount_percent = percent;
     
-    const gross = parseFloat(newItems[index].quantity || 0) * parseFloat(newItems[index].cost_price || 0);
+    const gross = parseFloat(newItems[index].quantity || 0) * parseFloat(newItems[index].unit_price || 0);
     const discountValue = gross * (parseFloat(percent || 0) / 100);
     
     newItems[index].discount_value = discountValue.toFixed(2);
@@ -127,7 +134,7 @@ export default function OpeningStockPage() {
     const newItems = [...items];
     newItems[index].discount_value = value;
     
-    const gross = parseFloat(newItems[index].quantity || 0) * parseFloat(newItems[index].cost_price || 0);
+    const gross = parseFloat(newItems[index].quantity || 0) * parseFloat(newItems[index].unit_price || 0);
     const discountPercent = gross > 0 ? (parseFloat(value || 0) / gross) * 100 : 0;
     
     newItems[index].discount_percent = discountPercent.toFixed(2);
@@ -138,7 +145,7 @@ export default function OpeningStockPage() {
 
   const calculateLineTotal = (index, itemsArray) => {
     const item = itemsArray[index];
-    const gross = parseFloat(item.quantity || 0) * parseFloat(item.cost_price || 0);
+    const gross = parseFloat(item.quantity || 0) * parseFloat(item.unit_price || 0);
     const discountValue = gross * (parseFloat(item.discount_percent || 0) / 100);
     
     itemsArray[index].discount_value = discountValue.toFixed(2);
@@ -147,7 +154,7 @@ export default function OpeningStockPage() {
 
   const calculateTotals = () => {
     const total_value = items.reduce((sum, item) => {
-      const gross = parseFloat(item.quantity || 0) * parseFloat(item.cost_price || 0);
+      const gross = parseFloat(item.quantity || 0) * parseFloat(item.unit_price || 0);
       return sum + gross;
     }, 0);
 
@@ -169,7 +176,7 @@ export default function OpeningStockPage() {
       item_name: '', 
       batch_no: '', 
       quantity: '', 
-      cost_price: '', 
+      unit_price: '', 
       discount_percent: '0', 
       discount_value: '0', 
       net_value: '0',
@@ -196,16 +203,24 @@ export default function OpeningStockPage() {
         return;
       }
 
+      // Validate stock for all items
+      for (const item of validItems) {
+        if (parseFloat(item.quantity) > parseFloat(item.current_stock)) {
+          alert(`Insufficient stock for ${item.item_name}! Available: ${item.current_stock}`);
+          return;
+        }
+      }
+
       setLoading(true);
 
-      await api.post('/opening-stock', {
+      await api.post('/sales-retail', {
         ...formData,
         items: validItems
       });
 
-      alert('Opening stock entry created successfully!');
+      alert('Sale created successfully!');
       resetForm();
-      fetchNextRefNumber();
+      fetchNextInvoiceNumber();
     } catch (error) {
       console.error('Error saving:', error);
       alert(error.response?.data?.error || 'Failed to save');
@@ -216,12 +231,14 @@ export default function OpeningStockPage() {
 
   const resetForm = () => {
     setFormData({
-      entry_date: new Date().toISOString().split('T')[0],
-      ref_number: '',
+      sale_date: new Date().toISOString().split('T')[0],
+      invoice_number: '',
+      customer_id: '',
       store_id: '',
-      supplier_id: '',
       description: '',
-      employee_id: ''
+      employee_id: '',
+      payment_method: 'cash',
+      payment_status: 'paid'
     });
     setItems([{ 
       item_id: '', 
@@ -229,7 +246,7 @@ export default function OpeningStockPage() {
       item_name: '', 
       batch_no: '', 
       quantity: '', 
-      cost_price: '', 
+      unit_price: '', 
       discount_percent: '0', 
       discount_value: '0', 
       net_value: '0',
@@ -248,28 +265,26 @@ export default function OpeningStockPage() {
       <div className="min-h-screen bg-gray-100 p-4 lg:ml-64">
         <div className="max-w-7xl mx-auto bg-white rounded-2xl shadow-lg p-8">
           
-          {/* Header */}
           <div className="flex justify-between items-center mb-6">
-            <h1 className="text-2xl font-bold text-gray-800">Opening Stock Entry</h1>
+            <h1 className="text-2xl font-bold text-gray-800">Sales - Retail</h1>
             <div className="flex gap-4">
               <input
                 type="date"
-                value={formData.entry_date}
-                onChange={(e) => setFormData({ ...formData, entry_date: e.target.value })}
+                value={formData.sale_date}
+                onChange={(e) => setFormData({ ...formData, sale_date: e.target.value })}
                 className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <input
                 type="text"
-                value={formData.ref_number}
+                value={formData.invoice_number}
                 readOnly
                 className="px-4 py-2 border border-gray-300 rounded-lg bg-gray-50"
-                placeholder="Ref Number"
+                placeholder="Invoice Number"
               />
             </div>
           </div>
 
-          {/* Dropdowns Row */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
             <div className="relative">
               <input
                 type="text"
@@ -281,30 +296,48 @@ export default function OpeningStockPage() {
             </div>
             
             <select
+              value={formData.customer_id}
+              onChange={(e) => setFormData({ ...formData, customer_id: e.target.value })}
+              className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Walk-in Customer</option>
+              {dropdowns.customers.map(customer => (
+                <option key={customer.id} value={customer.id}>{customer.name}</option>
+              ))}
+            </select>
+
+            <select
               value={formData.store_id}
               onChange={(e) => setFormData({ ...formData, store_id: e.target.value })}
               className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             >
-              <option value="">From Store</option>
+              <option value="">From Store *</option>
               {dropdowns.stores.map(store => (
                 <option key={store.id} value={store.id}>{store.name}</option>
               ))}
             </select>
 
             <select
-              value={formData.supplier_id}
-              onChange={(e) => setFormData({ ...formData, supplier_id: e.target.value })}
+              value={formData.payment_method}
+              onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}
               className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="">Supplier (Optional)</option>
-              {dropdowns.suppliers.map(supplier => (
-                <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
-              ))}
+              <option value="cash">Cash</option>
+              <option value="card">Card</option>
+              <option value="credit">Credit</option>
+            </select>
+
+            <select
+              value={formData.payment_status}
+              onChange={(e) => setFormData({ ...formData, payment_status: e.target.value })}
+              className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="paid">Paid</option>
+              <option value="unpaid">Not Paid</option>
             </select>
           </div>
 
-          {/* Items Table */}
           <div className="overflow-x-auto mb-6 bg-gray-50 rounded-lg p-4">
             <table className="w-full">
               <thead>
@@ -325,133 +358,55 @@ export default function OpeningStockPage() {
                 {items.map((item, index) => (
                   <tr key={index} className="border-b border-gray-200">
                     <td className="p-2">
-                      <input
-                        type="text"
-                        value={item.code}
-                        readOnly
-                        className="w-20 px-2 py-1 border border-gray-300 rounded bg-gray-50 text-sm"
-                      />
+                      <input type="text" value={item.code} readOnly className="w-20 px-2 py-1 border border-gray-300 rounded bg-gray-50 text-sm" />
                     </td>
                     <td className="p-2">
-                      <select
-                        value={item.item_id}
-                        onChange={(e) => handleItemSelect(index, e.target.value)}
-                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      >
+                      <select value={item.item_id} onChange={(e) => handleItemSelect(index, e.target.value)} className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                         <option value="">Select Item</option>
                         {filteredItems.map(itm => (
-                          <option key={itm.id} value={itm.id}>
-                            {itm.name} ({itm.code})
-                          </option>
+                          <option key={itm.id} value={itm.id}>{itm.name} ({itm.code})</option>
                         ))}
                       </select>
                     </td>
                     <td className="p-2">
-                      <input
-                        type="text"
-                        value={item.current_stock}
-                        readOnly
-                        className="w-16 px-2 py-1 border border-gray-300 rounded bg-blue-50 text-sm text-center font-semibold"
-                      />
+                      <input type="text" value={item.current_stock} readOnly className="w-16 px-2 py-1 border border-gray-300 rounded bg-blue-50 text-sm text-center font-semibold" />
                     </td>
                     <td className="p-2">
-                      <input
-                        type="text"
-                        value={item.batch_no}
-                        onChange={(e) => {
-                          const newItems = [...items];
-                          newItems[index].batch_no = e.target.value;
-                          setItems(newItems);
-                        }}
-                        className="w-24 px-2 py-1 border border-gray-300 rounded text-sm"
-                        placeholder="Batch"
-                      />
+                      <input type="text" value={item.batch_no} onChange={(e) => { const newItems = [...items]; newItems[index].batch_no = e.target.value; setItems(newItems); }} className="w-24 px-2 py-1 border border-gray-300 rounded text-sm" placeholder="Batch" />
                     </td>
                     <td className="p-2">
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={item.cost_price}
-                        readOnly
-                        className="w-24 px-2 py-1 border border-gray-300 rounded bg-gray-50 text-sm"
-                      />
+                      <input type="number" step="0.01" value={item.unit_price} readOnly className="w-24 px-2 py-1 border border-gray-300 rounded bg-gray-50 text-sm" />
                     </td>
                     <td className="p-2">
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={item.quantity}
-                        onChange={(e) => handleQuantityChange(index, e.target.value)}
-                        className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
-                        placeholder="0"
-                      />
+                      <input type="number" step="0.01" value={item.quantity} onChange={(e) => handleQuantityChange(index, e.target.value)} className="w-20 px-2 py-1 border border-gray-300 rounded text-sm" placeholder="0" />
                     </td>
                     <td className="p-2">
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={item.discount_percent}
-                        onChange={(e) => handleDiscountPercentChange(index, e.target.value)}
-                        className="w-20 px-2 py-1 border border-gray-300 rounded text-sm"
-                        placeholder="0"
-                      />
+                      <input type="number" step="0.01" value={item.discount_percent} onChange={(e) => handleDiscountPercentChange(index, e.target.value)} className="w-20 px-2 py-1 border border-gray-300 rounded text-sm" placeholder="0" />
                     </td>
                     <td className="p-2">
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={item.discount_value}
-                        onChange={(e) => handleDiscountValueChange(index, e.target.value)}
-                        className="w-24 px-2 py-1 border border-gray-300 rounded text-sm"
-                        placeholder="0.00"
-                      />
+                      <input type="number" step="0.01" value={item.discount_value} onChange={(e) => handleDiscountValueChange(index, e.target.value)} className="w-24 px-2 py-1 border border-gray-300 rounded text-sm" placeholder="0.00" />
                     </td>
                     <td className="p-2">
-                      <input
-                        type="text"
-                        value={item.net_value}
-                        readOnly
-                        className="w-28 px-2 py-1 border border-gray-300 rounded bg-green-50 text-sm font-semibold"
-                      />
+                      <input type="text" value={item.net_value} readOnly className="w-28 px-2 py-1 border border-gray-300 rounded bg-green-50 text-sm font-semibold" />
                     </td>
                     <td className="p-2">
-                      <button
-                        onClick={() => removeRow(index)}
-                        className="text-red-500 hover:text-red-700"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <button onClick={() => removeRow(index)} className="text-red-500 hover:text-red-700"><Trash2 className="w-4 h-4" /></button>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
             
-            <button
-              onClick={addRow}
-              className="mt-4 flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-            >
-              <Plus className="w-4 h-4" />
-              Add Row
+            <button onClick={addRow} className="mt-4 flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
+              <Plus className="w-4 h-4" />Add Row
             </button>
           </div>
 
-          {/* Bottom Section */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div className="space-y-4">
-              <input
-                type="text"
-                placeholder="Description"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              <input type="text" placeholder="Description" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
               
-              <select
-                value={formData.employee_id}
-                onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
+              <select value={formData.employee_id} onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="">Employee (Optional)</option>
                 {dropdowns.employees.map(emp => (
                   <option key={emp.id} value={emp.id}>{emp.name}</option>
@@ -460,63 +415,18 @@ export default function OpeningStockPage() {
             </div>
 
             <div className="space-y-4">
-              <input
-                type="text"
-                value={`Total Value: LKR ${totals.total_value.toFixed(2)}`}
-                readOnly
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 font-semibold"
-              />
-              <input
-                type="text"
-                value={`Item Discount: LKR ${totals.item_discount.toFixed(2)}`}
-                readOnly
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 font-semibold"
-              />
-              <input
-                type="text"
-                value={`Net Total: LKR ${totals.net_total.toFixed(2)}`}
-                readOnly
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-green-50 font-bold text-green-700 text-lg"
-              />
+              <input type="text" value={`Total Value: LKR ${totals.total_value.toFixed(2)}`} readOnly className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 font-semibold" />
+              <input type="text" value={`Item Discount: LKR ${totals.item_discount.toFixed(2)}`} readOnly className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 font-semibold" />
+              <input type="text" value={`Net Total: LKR ${totals.net_total.toFixed(2)}`} readOnly className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-green-50 font-bold text-green-700 text-lg" />
             </div>
           </div>
 
-          {/* Action Buttons */}
           <div className="flex gap-4 justify-center">
-            <button
-              onClick={() => window.history.back()}
-              className="px-8 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-medium"
-            >
-              &lt; Esc &gt; Exit
-            </button>
-            
-            <button
-              onClick={handleSave}
-              disabled={loading}
-              className="px-8 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-medium disabled:bg-gray-400"
-            >
-              {loading ? 'Saving...' : '< F8 > Save'}
-            </button>
-            
-            <button
-              onClick={resetForm}
-              className="px-8 py-3 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors font-medium"
-            >
-              &lt; F9 &gt; Delete
-            </button>
-            
-            <button
-              onClick={resetForm}
-              className="px-8 py-3 bg-gray-400 text-white rounded-lg hover:bg-gray-500 transition-colors font-medium"
-            >
-              &lt; F12 &gt; Cancel
-            </button>
-            
-            <button
-              className="px-8 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium"
-            >
-              &lt; F2 &gt; Print
-            </button>
+            <button onClick={() => window.history.back()} className="px-8 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-medium">&lt; Esc &gt; Exit</button>
+            <button onClick={handleSave} disabled={loading} className="px-8 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-medium disabled:bg-gray-400">{loading ? 'Saving...' : '< F8 > Save'}</button>
+            <button onClick={resetForm} className="px-8 py-3 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors font-medium">&lt; F9 &gt; Delete</button>
+            <button onClick={resetForm} className="px-8 py-3 bg-gray-400 text-white rounded-lg hover:bg-gray-500 transition-colors font-medium">&lt; F12 &gt; Cancel</button>
+            <button className="px-8 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium">&lt; F2 &gt; Print</button>
           </div>
         </div>
       </div>

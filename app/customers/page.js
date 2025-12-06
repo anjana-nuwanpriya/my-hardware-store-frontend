@@ -5,90 +5,84 @@ import { Plus, Edit, Trash2, Search, X } from 'lucide-react';
 import api from '@/lib/api';
 import EnhancedNavigation from '@/components/EnhancedNavigation';
 
-export default function SuppliersPage() {
-  const [suppliers, setSuppliers] = useState([]);
+export default function CustomersPage() {
+  const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
-  const [editingSupplier, setEditingSupplier] = useState(null);
+  const [editingCustomer, setEditingCustomer] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
     address: '',
+    type: 'retail',
     op_balance: '0'
   });
 
-  // Fetch suppliers
-  const fetchSuppliers = async () => {
+  const fetchCustomers = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/suppliers');
-      setSuppliers(response.data.suppliers || []);
+      const response = await api.get('/customers');
+      setCustomers(response.data.customers || []);
     } catch (error) {
-      console.error('Error fetching suppliers:', error);
-      alert('Failed to load suppliers');
+      console.error('Error fetching customers:', error);
+      alert('Failed to load customers');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchSuppliers();
+    fetchCustomers();
   }, []);
 
-  // Handle form submit
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
     try {
-      if (editingSupplier) {
-        // Update
-        await api.put(`/suppliers/${editingSupplier.id}`, formData);
-        alert('Supplier updated successfully!');
+      if (editingCustomer) {
+        await api.put(`/customers/${editingCustomer.id}`, formData);
+        alert('Customer updated successfully!');
       } else {
-        // Create
-        await api.post('/suppliers', formData);
-        alert('Supplier created successfully!');
+        await api.post('/customers', formData);
+        alert('Customer created successfully!');
       }
-      
-      fetchSuppliers();
+      fetchCustomers();
       closeModal();
     } catch (error) {
-      console.error('Error saving supplier:', error);
-      alert(error.response?.data?.error || 'Failed to save supplier');
+      console.error('Error saving customer:', error);
+      alert(error.response?.data?.error || 'Failed to save customer');
     }
   };
 
-  // Handle delete
   const handleDelete = async (id) => {
-    if (!confirm('Are you sure you want to delete this supplier?')) return;
-    
+    if (!confirm('Are you sure you want to delete this customer?')) return;
     try {
-      await api.delete(`/suppliers/${id}`);
-      alert('Supplier deleted successfully!');
-      fetchSuppliers();
+      await api.delete(`/customers/${id}`);
+      alert('Customer deleted successfully!');
+      fetchCustomers();
     } catch (error) {
-      console.error('Error deleting supplier:', error);
-      alert('Failed to delete supplier');
+      console.error('Error deleting customer:', error);
+      alert('Failed to delete customer');
     }
   };
 
-  // Open modal for add/edit
-  const openModal = (supplier = null) => {
-    if (supplier) {
-      setEditingSupplier(supplier);
+  const openModal = (customer = null) => {
+    if (customer) {
+      setEditingCustomer(customer);
       setFormData({
-        name: supplier.name,
-        phone: supplier.phone || '',
-        address: supplier.address || '',
-        op_balance: supplier.op_balance || '0'
+        name: customer.name,
+        phone: customer.phone || '',
+        address: customer.address || '',
+        type: customer.type || 'retail',
+        op_balance: customer.op_balance || '0'
       });
     } else {
-      setEditingSupplier(null);
+      setEditingCustomer(null);
       setFormData({
         name: '',
         phone: '',
         address: '',
+        type: 'retail',
         op_balance: '0'
       });
     }
@@ -97,115 +91,96 @@ export default function SuppliersPage() {
 
   const closeModal = () => {
     setShowModal(false);
-    setEditingSupplier(null);
+    setEditingCustomer(null);
     setFormData({
       name: '',
       phone: '',
       address: '',
+      type: 'retail',
       op_balance: '0'
     });
   };
 
-  // Filter suppliers
-  const filteredSuppliers = suppliers.filter(supplier =>
-    supplier.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (supplier.phone && supplier.phone.includes(searchTerm))
+  const filteredCustomers = customers.filter(customer =>
+    customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (customer.phone && customer.phone.includes(searchTerm))
   );
 
   return (
     <>
       <EnhancedNavigation />
       <div className="min-h-screen bg-gray-50 p-6 lg:ml-64">
-        {/* Header */}
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-800">Suppliers</h1>
-          <p className="text-gray-600 mt-1">Manage your suppliers</p>
+          <h1 className="text-3xl font-bold text-gray-800">Customers</h1>
+          <p className="text-gray-600 mt-1">Manage your customers</p>
         </div>
 
-        {/* Actions Bar */}
         <div className="bg-white rounded-lg shadow-sm p-4 mb-6 flex flex-col sm:flex-row gap-4 justify-between">
-          {/* Search */}
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
               type="text"
-              placeholder="Search suppliers..."
+              placeholder="Search customers..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
-
-          {/* Add Button */}
           <button
             onClick={() => openModal()}
             className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
           >
             <Plus className="w-5 h-5" />
-            Add Supplier
+            Add Customer
           </button>
         </div>
 
-        {/* Table */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
           {loading ? (
             <div className="flex justify-center items-center h-64">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
             </div>
-          ) : filteredSuppliers.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              No suppliers found
-            </div>
+          ) : filteredCustomers.length === 0 ? (
+            <div className="text-center py-12 text-gray-500">No customers found</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Name
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Phone
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Address
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      OP Balance
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">OP Balance</th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredSuppliers.map((supplier) => (
-                    <tr key={supplier.id} className="hover:bg-gray-50">
+                  {filteredCustomers.map((customer) => (
+                    <tr key={customer.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{supplier.name}</div>
+                        <div className="text-sm font-medium text-gray-900">{customer.name}</div>
+                        <div className="text-sm text-gray-500">{customer.address || '-'}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{supplier.phone || '-'}</div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900">{supplier.address || '-'}</div>
+                        <div className="text-sm text-gray-900">{customer.phone || '-'}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          LKR {parseFloat(supplier.op_balance || 0).toFixed(2)}
-                        </div>
+                        <span className={`px-2 py-1 text-xs rounded-full ${
+                          customer.type === 'wholesale' 
+                            ? 'bg-purple-100 text-purple-800' 
+                            : 'bg-blue-100 text-blue-800'
+                        }`}>
+                          {customer.type}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">LKR {parseFloat(customer.op_balance || 0).toFixed(2)}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button
-                          onClick={() => openModal(supplier)}
-                          className="text-blue-600 hover:text-blue-900 mr-4"
-                        >
+                        <button onClick={() => openModal(customer)} className="text-blue-600 hover:text-blue-900 mr-4">
                           <Edit className="w-5 h-5 inline" />
                         </button>
-                        <button
-                          onClick={() => handleDelete(supplier.id)}
-                          className="text-red-600 hover:text-red-900"
-                        >
+                        <button onClick={() => handleDelete(customer.id)} className="text-red-600 hover:text-red-900">
                           <Trash2 className="w-5 h-5 inline" />
                         </button>
                       </td>
@@ -217,42 +192,33 @@ export default function SuppliersPage() {
           )}
         </div>
 
-        {/* Modal */}
         {showModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-              {/* Modal Header */}
               <div className="flex justify-between items-center p-6 border-b">
                 <h2 className="text-xl font-bold text-gray-900">
-                  {editingSupplier ? 'Edit Supplier' : 'Add New Supplier'}
+                  {editingCustomer ? 'Edit Customer' : 'Add New Customer'}
                 </h2>
                 <button onClick={closeModal} className="text-gray-400 hover:text-gray-600">
                   <X className="w-6 h-6" />
                 </button>
               </div>
 
-              {/* Modal Body */}
               <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                {/* Name */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Name *
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
                   <input
                     type="text"
                     required
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Enter supplier name"
+                    placeholder="Enter customer name"
                   />
                 </div>
 
-                {/* Phone */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Phone
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
                   <input
                     type="text"
                     value={formData.phone}
@@ -262,11 +228,8 @@ export default function SuppliersPage() {
                   />
                 </div>
 
-                {/* Address */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Address
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
                   <textarea
                     value={formData.address}
                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
@@ -276,11 +239,20 @@ export default function SuppliersPage() {
                   />
                 </div>
 
-                {/* Opening Balance */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Opening Balance (LKR)
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Type *</label>
+                  <select
+                    value={formData.type}
+                    onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="retail">Retail</option>
+                    <option value="wholesale">Wholesale</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Opening Balance (LKR)</label>
                   <input
                     type="number"
                     step="0.01"
@@ -291,7 +263,6 @@ export default function SuppliersPage() {
                   />
                 </div>
 
-                {/* Buttons */}
                 <div className="flex gap-3 pt-4">
                   <button
                     type="button"
@@ -304,7 +275,7 @@ export default function SuppliersPage() {
                     type="submit"
                     className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                   >
-                    {editingSupplier ? 'Update' : 'Create'}
+                    {editingCustomer ? 'Update' : 'Create'}
                   </button>
                 </div>
               </form>

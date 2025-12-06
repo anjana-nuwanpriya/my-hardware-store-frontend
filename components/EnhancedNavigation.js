@@ -12,14 +12,7 @@ import {
   ChevronDown,
   ChevronRight,
   Store,
-  Building2,
   FolderTree,
-  Tag,
-  Palette,
-  Ruler,
-  Pill,
-  FileStack,
-  Factory,
   Receipt,
   ShoppingBag,
   FileOutput,
@@ -37,7 +30,9 @@ import {
   LogOut,
   Menu,
   X,
-  TrendingUp
+  TrendingUp,
+  UserCog,
+  Tag
 } from 'lucide-react';
 
 export default function EnhancedNavigation() {
@@ -45,7 +40,6 @@ export default function EnhancedNavigation() {
   const router = useRouter();
   const pathname = usePathname();
   
-  // All sections expanded by default
   const [expandedSections, setExpandedSections] = useState({
     masters: true,
     transactions: true,
@@ -69,18 +63,22 @@ export default function EnhancedNavigation() {
 
   const isActive = (path) => pathname === path;
 
-  // Masters Section - Now includes Dashboard, POS, Inventory
-  const mastersItems = [
-    { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-    { name: 'Point of Sale', path: '/pos', icon: ShoppingCart },
-    { name: 'Inventory', path: '/inventory', icon: Package },
+  // Masters Section - Item Details added before Employee
+    const mastersItems = [
+    // REMOVED: Dashboard
+    // REMOVED: Point of Sale
+    // REMOVED: Inventory
+
     { name: 'Supplier', path: '/suppliers', icon: Users },
     { name: 'Customer', path: '/customers', icon: Users },
     { name: 'Stores', path: '/stores', icon: Store },
     { name: 'Category', path: '/categories', icon: FolderTree },
+    { name: 'Item Details', path: '/items', icon: Tag },
+    { name: 'Employee', path: '/employees', icon: UserCog },
   ];
 
-  // Transaction Section - Only specified items
+
+  // Transaction Section
   const transactionItems = [
     { name: 'Supplier OP Balance', path: '/supplier-op-balance', icon: Banknote },
     { name: 'Customer OP Balance', path: '/customer-op-balance', icon: Wallet },
@@ -102,24 +100,20 @@ export default function EnhancedNavigation() {
     { name: 'Bank Entries', path: '/bank-entries', icon: Banknote },
   ];
 
-  // Reports Section
   const reportsItems = [
     { name: 'Reports', path: '/reports', icon: FileText },
   ];
 
-  // Utilities Section
   const utilitiesItems = [
     { name: 'Utilities', path: '/utilities', icon: Wrench },
   ];
 
-  // Helps Section
   const helpsItems = [
     { name: 'Helps', path: '/helps', icon: HelpCircle },
   ];
 
   return (
     <>
-      {/* Mobile menu button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-white rounded-lg shadow-lg"
@@ -127,12 +121,10 @@ export default function EnhancedNavigation() {
         {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
       </button>
 
-      {/* Sidebar */}
       <div className={`
         fixed top-0 left-0 h-full bg-gradient-to-b from-gray-900 to-gray-800 text-white shadow-xl z-40 w-64 transform transition-transform duration-300 ease-in-out overflow-y-auto
         ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
-        {/* Header */}
         <div className="p-4 border-b border-gray-700">
           <h1 className="text-xl font-bold text-center bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
             Hardware Shop
@@ -350,7 +342,6 @@ export default function EnhancedNavigation() {
         </div>
       </div>
 
-      {/* Overlay for mobile */}
       {isOpen && (
         <div
           className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-30"
@@ -358,7 +349,6 @@ export default function EnhancedNavigation() {
         />
       )}
 
-      {/* Main content spacer */}
       <div className="lg:ml-64"></div>
     </>
   );

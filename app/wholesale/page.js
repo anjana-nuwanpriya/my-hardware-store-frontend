@@ -1,504 +1,435 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import EnhancedNavigation from '@/components/EnhancedNavigation';
+import { useState, useEffect } from 'react';
+import { Plus, Trash2 } from 'lucide-react';
 import api from '@/lib/api';
+import EnhancedNavigation from '@/components/EnhancedNavigation';
 
-export default function WholesalePage() {
-  const [products, setProducts] = useState([]);
-  const [customers, setCustomers] = useState([]);
-  const [staff, setStaff] = useState([]);
-  const [stores] = useState([{ id: 1, code: 'MAIN', name: 'Main Store' }]);
-  const [selectedStore, setSelectedStore] = useState(stores[0]);
-  const [selectedCustomer, setSelectedCustomer] = useState(null);
-  const [selectedStaff, setSelectedStaff] = useState(null);
-  const [orderItems, setOrderItems] = useState([]);
-  const [selectedRow, setSelectedRow] = useState(null);
-  const [description, setDescription] = useState('');
-  const [billNumber, setBillNumber] = useState('');
-  const [refNumber, setRefNumber] = useState('');
-  const [currentDate, setCurrentDate] = useState('');
+export default function SalesWholesalePage() {
+  const [formData, setFormData] = useState({
+    sale_date: new Date().toISOString().split('T')[0],
+    invoice_number: '',
+    customer_id: '',
+    store_id: '',
+    description: '',
+    employee_id: '',
+    payment_method: 'cash',
+    payment_status: 'paid'
+  });
+
+  const [items, setItems] = useState([
+    { 
+      item_id: '', 
+      code: '', 
+      item_name: '', 
+      batch_no: '', 
+      quantity: '', 
+      unit_price: '', 
+      discount_percent: '0', 
+      discount_value: '0', 
+      net_value: '0',
+      current_stock: '0'
+    }
+  ]);
+
+  const [dropdowns, setDropdowns] = useState({
+    allItems: [],
+    stores: [],
+    customers: [],
+    employees: []
+  });
+
+  const [totals, setTotals] = useState({
+    total_value: 0,
+    item_discount: 0,
+    net_total: 0
+  });
+
   const [searchTerm, setSearchTerm] = useState('');
-  const [filteredProducts, setFilteredProducts] = useState([]);
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [selectedIndex, setSelectedIndex] = useState(-1);
-  const itemInputRef = useRef(null);
-  const dropdownRef = useRef(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    loadInitialData();
-    generateBillNumbers();
-    setCurrentDate(new Date().toLocaleDateString('en-GB'));
-    setTimeout(() => itemInputRef.current?.focus(), 100);
-
-    const handleKeyDown = (e) => {
-      if (e.key === 'F8') { e.preventDefault(); handleSave(); }
-      if (e.key === 'F9') { e.preventDefault(); handleDelete(); }
-      if (e.key === 'F12') { e.preventDefault(); handleCancel(); }
-      if (e.key === 'F2') { e.preventDefault(); handlePrint(); }
-      if (e.key === 'Escape' && !showDropdown) { handleExit(); }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showDropdown]);
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setShowDropdown(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    fetchDropdowns();
+    fetchNextInvoiceNumber();
   }, []);
 
-  const loadInitialData = async () => {
+  useEffect(() => {
+    calculateTotals();
+  }, [items]);
+
+  const fetchDropdowns = async () => {
     try {
-      const [prodRes, custRes, staffRes] = await Promise.all([
-        api.get('/products'),
+      const [itemsRes, storesRes, customersRes, employeesRes] = await Promise.all([
+        api.get('/items'),
+        api.get('/stores'),
         api.get('/customers'),
-        api.get('/staff').catch(() => ({ data: { staff: [] } }))
+        api.get('/employees')
       ]);
-      setProducts(prodRes.data.products || []);
-      setCustomers(custRes.data.customers || []);
-      setStaff(staffRes.data.staff || []);
+
+      setDropdowns({
+        allItems: itemsRes.data.items || [],
+        stores: storesRes.data.stores || [],
+        customers: customersRes.data.customers || [],
+        employees: employeesRes.data.employees || []
+      });
     } catch (error) {
-      console.error('Error loading data:', error);
+      console.error('Error fetching dropdowns:', error);
     }
   };
 
-  const generateBillNumbers = async () => {
+  const fetchNextInvoiceNumber = async () => {
     try {
-      const response = await api.get('/orders');
-      const orders = response.data.orders || [];
-      if (orders.length > 0) {
-        const lastOrder = orders[0];
-        const orderNumber = lastOrder.order_number || 'WS-000000';
-        const lastNumber = parseInt(orderNumber.split('-')[1]) || 0;
-        setBillNumber(`WS-${String(lastNumber + 1).padStart(6, '0')}`);
-        setRefNumber(`WS-${String(lastNumber).padStart(6, '0')}`);
-      } else {
-        setBillNumber('WS-000001');
-        setRefNumber('WS-000000');
-      }
+      const res = await api.get('/sales-wholesale/next/invoice-number');
+      setFormData(prev => ({ ...prev, invoice_number: res.data.invoiceNumber }));
     } catch (error) {
-      setBillNumber('WS-000001');
-      setRefNumber('WS-000000');
+      console.error('Error fetching invoice number:', error);
     }
   };
 
-  const handleSearchChange = (e) => {
-    const value = e.target.value;
-    setSearchTerm(value);
-    setSelectedIndex(-1);
-    if (value.trim().length === 0) {
-      setFilteredProducts([]);
-      setShowDropdown(false);
-      return;
-    }
-    const filtered = products.filter(product => {
-      const searchLower = value.toLowerCase();
-      return (
-        product.name?.toLowerCase().includes(searchLower) ||
-        product.sku?.toLowerCase().includes(searchLower) ||
-        product.barcode?.toLowerCase().includes(searchLower)
-      );
-    }).slice(0, 10);
-    setFilteredProducts(filtered);
-    setShowDropdown(filtered.length > 0);
-  };
-
-  const handleKeyDown = (e) => {
-    if (!showDropdown) {
-      if (e.key === 'Enter' && searchTerm.trim()) {
-        const exactMatch = products.find(p => 
-          p.sku?.toLowerCase() === searchTerm.toLowerCase() || 
-          p.barcode?.toLowerCase() === searchTerm.toLowerCase()
-        );
-        if (exactMatch) selectProduct(exactMatch);
-      }
-      return;
-    }
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setSelectedIndex(prev => prev < filteredProducts.length - 1 ? prev + 1 : prev);
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setSelectedIndex(prev => prev > 0 ? prev - 1 : -1);
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      if (selectedIndex >= 0 && filteredProducts[selectedIndex]) {
-        selectProduct(filteredProducts[selectedIndex]);
-      } else if (filteredProducts.length > 0) {
-        selectProduct(filteredProducts[0]);
-      }
-    } else if (e.key === 'Escape') {
-      setShowDropdown(false);
-      setSearchTerm('');
-      setSelectedIndex(-1);
-    }
-  };
-
-  const selectProduct = (product) => {
-    addItemToCart(product);
-    setSearchTerm('');
-    setFilteredProducts([]);
-    setShowDropdown(false);
-    setSelectedIndex(-1);
-    setTimeout(() => itemInputRef.current?.focus(), 100);
-  };
-
-  const addItemToCart = (product) => {
-    const existingIndex = orderItems.findIndex(item => item.product_id === product.id);
-    if (existingIndex >= 0) {
-      const newItems = [...orderItems];
-      newItems[existingIndex].quantity += 1;
-      newItems[existingIndex].line_total = newItems[existingIndex].quantity * newItems[existingIndex].unit_price;
-      setOrderItems(newItems);
-    } else {
-      const newItem = {
-        product_id: product.id,
-        code: product.sku,
-        name: product.name,
-        batch_no: '',
-        quantity: 1,
-        unit_price: parseFloat(product.selling_price || 0),
-        discount_percentage: 0,
-        discount_value: 0,
-        line_total: parseFloat(product.selling_price || 0)
+  const handleItemSelect = (index, itemId) => {
+    const selectedItem = dropdowns.allItems.find(i => i.id === itemId);
+    if (selectedItem) {
+      const newItems = [...items];
+      newItems[index] = {
+        ...newItems[index],
+        item_id: selectedItem.id,
+        code: selectedItem.code,
+        item_name: selectedItem.name,
+        unit_price: selectedItem.wholesale_price || '0',
+        current_stock: selectedItem.stock_quantity || '0'
       };
-      setOrderItems([...orderItems, newItem]);
-      setSelectedRow(orderItems.length);
+      setItems(newItems);
+      calculateLineTotal(index, newItems);
     }
   };
 
-  const updateItem = (index, field, value) => {
-    const newItems = [...orderItems];
-    newItems[index][field] = value;
-    if (field === 'quantity' || field === 'unit_price' || field === 'discount_percentage') {
-      const qty = parseFloat(newItems[index].quantity) || 0;
-      const price = parseFloat(newItems[index].unit_price) || 0;
-      const discPer = parseFloat(newItems[index].discount_percentage) || 0;
-      const subtotal = qty * price;
-      const discValue = (subtotal * discPer) / 100;
-      newItems[index].discount_value = discValue;
-      newItems[index].line_total = subtotal - discValue;
+  const handleQuantityChange = (index, quantity) => {
+    const newItems = [...items];
+    const currentStock = parseFloat(newItems[index].current_stock || 0);
+    
+    if (parseFloat(quantity) > currentStock) {
+      alert(`Insufficient stock! Available: ${currentStock}`);
+      return;
     }
-    setOrderItems(newItems);
+    
+    newItems[index].quantity = quantity;
+    setItems(newItems);
+    calculateLineTotal(index, newItems);
   };
 
-  const removeItem = (index) => {
-    setOrderItems(orderItems.filter((_, i) => i !== index));
-    setSelectedRow(null);
+  const handleDiscountPercentChange = (index, percent) => {
+    const newItems = [...items];
+    newItems[index].discount_percent = percent;
+    
+    const gross = parseFloat(newItems[index].quantity || 0) * parseFloat(newItems[index].unit_price || 0);
+    const discountValue = gross * (parseFloat(percent || 0) / 100);
+    
+    newItems[index].discount_value = discountValue.toFixed(2);
+    newItems[index].net_value = (gross - discountValue).toFixed(2);
+    
+    setItems(newItems);
+  };
+
+  const handleDiscountValueChange = (index, value) => {
+    const newItems = [...items];
+    newItems[index].discount_value = value;
+    
+    const gross = parseFloat(newItems[index].quantity || 0) * parseFloat(newItems[index].unit_price || 0);
+    const discountPercent = gross > 0 ? (parseFloat(value || 0) / gross) * 100 : 0;
+    
+    newItems[index].discount_percent = discountPercent.toFixed(2);
+    newItems[index].net_value = (gross - parseFloat(value || 0)).toFixed(2);
+    
+    setItems(newItems);
+  };
+
+  const calculateLineTotal = (index, itemsArray) => {
+    const item = itemsArray[index];
+    const gross = parseFloat(item.quantity || 0) * parseFloat(item.unit_price || 0);
+    const discountValue = gross * (parseFloat(item.discount_percent || 0) / 100);
+    
+    itemsArray[index].discount_value = discountValue.toFixed(2);
+    itemsArray[index].net_value = (gross - discountValue).toFixed(2);
   };
 
   const calculateTotals = () => {
-    const subtotal = orderItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
-    const totalDiscount = orderItems.reduce((sum, item) => sum + (item.discount_value || 0), 0);
-    const netTotal = subtotal - totalDiscount;
-    return { subtotal, totalDiscount, netTotal };
+    const total_value = items.reduce((sum, item) => {
+      const gross = parseFloat(item.quantity || 0) * parseFloat(item.unit_price || 0);
+      return sum + gross;
+    }, 0);
+
+    const item_discount = items.reduce((sum, item) => 
+      sum + parseFloat(item.discount_value || 0), 0
+    );
+
+    const net_total = items.reduce((sum, item) => 
+      sum + parseFloat(item.net_value || 0), 0
+    );
+
+    setTotals({ total_value, item_discount, net_total });
+  };
+
+  const addRow = () => {
+    setItems([...items, { 
+      item_id: '', 
+      code: '', 
+      item_name: '', 
+      batch_no: '', 
+      quantity: '', 
+      unit_price: '', 
+      discount_percent: '0', 
+      discount_value: '0', 
+      net_value: '0',
+      current_stock: '0'
+    }]);
+  };
+
+  const removeRow = (index) => {
+    if (items.length > 1) {
+      setItems(items.filter((_, i) => i !== index));
+    }
   };
 
   const handleSave = async () => {
-    if (orderItems.length === 0) {
-      alert('Please add items to the order');
-      return;
-    }
     try {
-      const totals = calculateTotals();
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
-      const orderData = {
-        customer_id: selectedCustomer?.id || null,
-        staff_id: selectedStaff?.id || user.id,
-        items: orderItems.map(item => ({
-          product_id: item.product_id,
-          sku: item.code,
-          name: item.name,
-          quantity: item.quantity,
-          unit_price: item.unit_price,
-          discount_percentage: item.discount_percentage,
-          discount_amount: item.discount_value
-        })),
-        subtotal: totals.subtotal,
-        discount_amount: totals.totalDiscount,
-        total_amount: totals.netTotal,
-        payment_method: 'cash',
-        payment_status: 'paid',
-        notes: description || 'Wholesale Sale'
-      };
-      const response = await api.post('/orders', orderData);
-      alert(`✅ Wholesale order saved successfully!\nOrder #: ${response.data.order_number || billNumber}`);
-      printReceipt({
-        ...orderData,
-        order_number: response.data.order_number || billNumber,
-        subtotal: totals.subtotal,
-        discount_amount: totals.totalDiscount,
-        total_amount: totals.netTotal
+      if (!formData.store_id) {
+        alert('Please select a store');
+        return;
+      }
+
+      const validItems = items.filter(item => item.item_id && parseFloat(item.quantity) > 0);
+      if (validItems.length === 0) {
+        alert('Please add at least one item');
+        return;
+      }
+
+      // Validate stock for all items
+      for (const item of validItems) {
+        if (parseFloat(item.quantity) > parseFloat(item.current_stock)) {
+          alert(`Insufficient stock for ${item.item_name}! Available: ${item.current_stock}`);
+          return;
+        }
+      }
+
+      setLoading(true);
+
+      await api.post('/sales-wholesale', {
+        ...formData,
+        items: validItems
       });
-      handleCancel();
+
+      alert('Wholesale sale created successfully!');
+      resetForm();
+      fetchNextInvoiceNumber();
     } catch (error) {
-      console.error('Save error:', error);
-      alert('Failed to save order: ' + (error.response?.data?.error || error.message));
+      console.error('Error saving:', error);
+      alert(error.response?.data?.error || 'Failed to save');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const printReceipt = (order) => {
-    try {
-      const printFrame = document.createElement('iframe');
-      printFrame.style.position = 'fixed';
-      printFrame.style.right = '0';
-      printFrame.style.bottom = '0';
-      printFrame.style.width = '0';
-      printFrame.style.height = '0';
-      printFrame.style.border = '0';
-      document.body.appendChild(printFrame);
-      const printDocument = printFrame.contentWindow.document;
-      printDocument.write(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Wholesale Receipt - ${order.order_number}</title>
-          <style>
-            body { font-family: 'Courier New', monospace; width: 80mm; margin: 0; padding: 10px; font-size: 12px; }
-            .header { text-align: center; margin-bottom: 15px; border-bottom: 2px dashed #000; padding-bottom: 10px; }
-            .header h1 { margin: 0; font-size: 18px; }
-            .info { margin-bottom: 10px; border-bottom: 1px dashed #000; padding-bottom: 10px; }
-            .info div { display: flex; justify-content: space-between; margin: 3px 0; }
-            table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
-            th { border-bottom: 1px solid #000; text-align: left; padding: 5px 0; }
-            td { padding: 5px 0; border-bottom: 1px dotted #ccc; }
-            .text-right { text-align: right; }
-            .text-center { text-align: center; }
-            .totals { border-top: 2px solid #000; padding-top: 10px; margin-top: 10px; }
-            .totals div { display: flex; justify-content: space-between; margin: 5px 0; }
-            .grand-total { font-size: 16px; font-weight: bold; border-top: 2px solid #000; padding-top: 10px; margin-top: 10px; }
-            .footer { text-align: center; margin-top: 20px; font-size: 10px; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h1>HARDWARE SHOP</h1>
-            <p>WHOLESALE INVOICE</p>
-            <p>${selectedStore?.name || 'Main Store'}</p>
-          </div>
-          <div class="info">
-            <div><span>Date:</span><span>${currentDate}</span></div>
-            <div><span>Invoice #:</span><span>${order.order_number}</span></div>
-            ${selectedCustomer ? `<div><span>Customer:</span><span>${selectedCustomer.first_name} ${selectedCustomer.last_name}</span></div>` : ''}
-            ${selectedStaff ? `<div><span>Staff:</span><span>${selectedStaff.first_name} ${selectedStaff.last_name}</span></div>` : ''}
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th>Item</th>
-                <th class="text-center">Qty</th>
-                <th class="text-right">Price</th>
-                <th class="text-right">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${order.items.map(item => `
-                <tr>
-                  <td>${item.name}</td>
-                  <td class="text-center">${item.quantity}</td>
-                  <td class="text-right">${item.unit_price.toFixed(2)}</td>
-                  <td class="text-right">${(item.unit_price * item.quantity).toFixed(2)}</td>
-                </tr>
-                ${item.discount_percentage > 0 ? `
-                  <tr>
-                    <td colspan="4" style="font-size: 10px; color: #666;">
-                      Discount ${item.discount_percentage}%: -Rs ${item.discount_amount.toFixed(2)}
-                    </td>
-                  </tr>
-                ` : ''}
-              `).join('')}
-            </tbody>
-          </table>
-          <div class="totals">
-            <div><span>Subtotal:</span><span>Rs ${order.subtotal.toFixed(2)}</span></div>
-            ${order.discount_amount > 0 ? `<div style="color: #dc2626;"><span>Total Discount:</span><span>Rs ${order.discount_amount.toFixed(2)}</span></div>` : ''}
-            <div class="grand-total"><span>NET TOTAL:</span><span>Rs ${order.total_amount.toFixed(2)}</span></div>
-          </div>
-          <div class="footer">
-            <p><strong>Thank you for your business!</strong></p>
-            <p>Wholesale Department</p>
-          </div>
-        </body>
-        </html>
-      `);
-      printDocument.close();
-      setTimeout(() => {
-        printFrame.contentWindow.focus();
-        printFrame.contentWindow.print();
-        setTimeout(() => document.body.removeChild(printFrame), 1000);
-      }, 250);
-    } catch (error) {
-      alert('Failed to print: ' + error.message);
-    }
-  };
-
-  const handlePrint = () => {
-    if (orderItems.length === 0) {
-      alert('No items to print');
-      return;
-    }
-    const totals = calculateTotals();
-    printReceipt({
-      order_number: billNumber,
-      items: orderItems.map(item => ({ ...item, discount_amount: item.discount_value })),
-      subtotal: totals.subtotal,
-      discount_amount: totals.totalDiscount,
-      total_amount: totals.netTotal
+  const resetForm = () => {
+    setFormData({
+      sale_date: new Date().toISOString().split('T')[0],
+      invoice_number: '',
+      customer_id: '',
+      store_id: '',
+      description: '',
+      employee_id: '',
+      payment_method: 'cash',
+      payment_status: 'paid'
     });
+    setItems([{ 
+      item_id: '', 
+      code: '', 
+      item_name: '', 
+      batch_no: '', 
+      quantity: '', 
+      unit_price: '', 
+      discount_percent: '0', 
+      discount_value: '0', 
+      net_value: '0',
+      current_stock: '0'
+    }]);
   };
 
-  const handleDelete = () => {
-    if (selectedRow !== null && orderItems[selectedRow]) {
-      if (confirm('Delete this item?')) removeItem(selectedRow);
-    } else {
-      alert('Please select an item to delete');
-    }
-  };
-
-  const handleCancel = () => {
-    if (orderItems.length > 0 && !confirm('Cancel this order? All items will be cleared.')) return;
-    setOrderItems([]);
-    setSelectedCustomer(null);
-    setSelectedStaff(null);
-    setDescription('');
-    setSelectedRow(null);
-    setSearchTerm('');
-    setShowDropdown(false);
-    generateBillNumbers();
-    setTimeout(() => itemInputRef.current?.focus(), 100);
-  };
-
-  const handleExit = () => {
-    if (orderItems.length > 0 && !confirm('Exit? Unsaved changes will be lost.')) return;
-    window.history.back();
-  };
-
-  const totals = calculateTotals();
+  const filteredItems = dropdowns.allItems.filter(item =>
+    item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.code.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <>
       <EnhancedNavigation />
-      <div className="lg:ml-64 p-8">
-        <div className="max-w-6xl mx-auto">
-          <div className="bg-white rounded-[32px] shadow-lg p-10">
-            {/* Header Badge */}
-            <div className="flex items-center justify-center mb-6">
-              {/* <div className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-2 rounded-full font-semibold">
-                WHOLESALE
-              </div> */}
+      <div className="min-h-screen bg-gray-100 p-4 lg:ml-64">
+        <div className="max-w-7xl mx-auto bg-white rounded-2xl shadow-lg p-8">
+          
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-2xl font-bold text-gray-800">Sales - Wholesale</h1>
+            <div className="flex gap-4">
+              <input
+                type="date"
+                value={formData.sale_date}
+                onChange={(e) => setFormData({ ...formData, sale_date: e.target.value })}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <input
+                type="text"
+                value={formData.invoice_number}
+                readOnly
+                className="px-4 py-2 border border-gray-300 rounded-lg bg-gray-50"
+                placeholder="Invoice Number"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search Item..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            
+            <select
+              value={formData.customer_id}
+              onChange={(e) => setFormData({ ...formData, customer_id: e.target.value })}
+              className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Walk-in Customer</option>
+              {dropdowns.customers.filter(c => c.type === 'wholesale').map(customer => (
+                <option key={customer.id} value={customer.id}>{customer.name}</option>
+              ))}
+            </select>
+
+            <select
+              value={formData.store_id}
+              onChange={(e) => setFormData({ ...formData, store_id: e.target.value })}
+              className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+            >
+              <option value="">From Store *</option>
+              {dropdowns.stores.map(store => (
+                <option key={store.id} value={store.id}>{store.name}</option>
+              ))}
+            </select>
+
+            <select
+              value={formData.payment_method}
+              onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}
+              className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="cash">Cash</option>
+              <option value="card">Card</option>
+              <option value="credit">Credit</option>
+            </select>
+
+            <select
+              value={formData.payment_status}
+              onChange={(e) => setFormData({ ...formData, payment_status: e.target.value })}
+              className="px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="paid">Paid</option>
+              <option value="unpaid">Not Paid</option>
+            </select>
+          </div>
+
+          <div className="overflow-x-auto mb-6 bg-gray-50 rounded-lg p-4">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-300">
+                  <th className="text-left p-2 text-sm font-medium text-gray-600">Code</th>
+                  <th className="text-left p-2 text-sm font-medium text-gray-600">Item</th>
+                  <th className="text-left p-2 text-sm font-medium text-gray-600">Stock</th>
+                  <th className="text-left p-2 text-sm font-medium text-gray-600">Batch No</th>
+                  <th className="text-left p-2 text-sm font-medium text-gray-600">W/Sale Price</th>
+                  <th className="text-left p-2 text-sm font-medium text-gray-600">Qty</th>
+                  <th className="text-left p-2 text-sm font-medium text-gray-600">Dis%</th>
+                  <th className="text-left p-2 text-sm font-medium text-gray-600">Dis Val</th>
+                  <th className="text-left p-2 text-sm font-medium text-gray-600">Net Value</th>
+                  <th className="w-10"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item, index) => (
+                  <tr key={index} className="border-b border-gray-200">
+                    <td className="p-2">
+                      <input type="text" value={item.code} readOnly className="w-20 px-2 py-1 border border-gray-300 rounded bg-gray-50 text-sm" />
+                    </td>
+                    <td className="p-2">
+                      <select value={item.item_id} onChange={(e) => handleItemSelect(index, e.target.value)} className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">Select Item</option>
+                        {filteredItems.map(itm => (
+                          <option key={itm.id} value={itm.id}>{itm.name} ({itm.code})</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="p-2">
+                      <input type="text" value={item.current_stock} readOnly className="w-16 px-2 py-1 border border-gray-300 rounded bg-blue-50 text-sm text-center font-semibold" />
+                    </td>
+                    <td className="p-2">
+                      <input type="text" value={item.batch_no} onChange={(e) => { const newItems = [...items]; newItems[index].batch_no = e.target.value; setItems(newItems); }} className="w-24 px-2 py-1 border border-gray-300 rounded text-sm" placeholder="Batch" />
+                    </td>
+                    <td className="p-2">
+                      <input type="number" step="0.01" value={item.unit_price} readOnly className="w-24 px-2 py-1 border border-gray-300 rounded bg-gray-50 text-sm" />
+                    </td>
+                    <td className="p-2">
+                      <input type="number" step="0.01" value={item.quantity} onChange={(e) => handleQuantityChange(index, e.target.value)} className="w-20 px-2 py-1 border border-gray-300 rounded text-sm" placeholder="0" />
+                    </td>
+                    <td className="p-2">
+                      <input type="number" step="0.01" value={item.discount_percent} onChange={(e) => handleDiscountPercentChange(index, e.target.value)} className="w-20 px-2 py-1 border border-gray-300 rounded text-sm" placeholder="0" />
+                    </td>
+                    <td className="p-2">
+                      <input type="number" step="0.01" value={item.discount_value} onChange={(e) => handleDiscountValueChange(index, e.target.value)} className="w-24 px-2 py-1 border border-gray-300 rounded text-sm" placeholder="0.00" />
+                    </td>
+                    <td className="p-2">
+                      <input type="text" value={item.net_value} readOnly className="w-28 px-2 py-1 border border-gray-300 rounded bg-green-50 text-sm font-semibold" />
+                    </td>
+                    <td className="p-2">
+                      <button onClick={() => removeRow(index)} className="text-red-500 hover:text-red-700"><Trash2 className="w-4 h-4" /></button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            
+            <button onClick={addRow} className="mt-4 flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
+              <Plus className="w-4 h-4" />Add Row
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div className="space-y-4">
+              <input type="text" placeholder="Description" value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              
+              <select value={formData.employee_id} onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="">Employee (Optional)</option>
+                {dropdowns.employees.map(emp => (
+                  <option key={emp.id} value={emp.id}>{emp.name}</option>
+                ))}
+              </select>
             </div>
 
-            <div className="flex justify-end gap-4 mb-8">
-              <div className="text-right">
-                <label className="block text-xs text-gray-500 mb-1">Date</label>
-                <input type="text" value={currentDate} readOnly className="w-40 px-6 py-3 bg-white border border-gray-300 rounded-full text-center text-sm text-gray-600" />
-              </div>
-              <div className="text-right">
-                <label className="block text-xs text-gray-500 mb-1">Ref Number</label>
-                <input type="text" value={refNumber} readOnly className="w-40 px-6 py-3 bg-white border border-gray-300 rounded-full text-center text-sm text-gray-600" />
-              </div>
+            <div className="space-y-4">
+              <input type="text" value={`Total Value: LKR ${totals.total_value.toFixed(2)}`} readOnly className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 font-semibold" />
+              <input type="text" value={`Item Discount: LKR ${totals.item_discount.toFixed(2)}`} readOnly className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 font-semibold" />
+              <input type="text" value={`Net Total: LKR ${totals.net_total.toFixed(2)}`} readOnly className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-green-50 font-bold text-green-700 text-lg" />
             </div>
-            <div className="flex gap-3 mb-6">
-              <div className="flex-1 relative" ref={dropdownRef}>
-                <input ref={itemInputRef} type="text" value={searchTerm} onChange={handleSearchChange} onKeyDown={handleKeyDown} placeholder="Search item by name, SKU, or barcode..." className="w-full px-6 py-3 bg-white border-2 border-purple-400 rounded-full text-sm focus:outline-none focus:border-purple-600 focus:ring-2 focus:ring-purple-200" />
-                {showDropdown && (
-                  <div className="absolute z-50 w-full mt-2 bg-white border-2 border-gray-300 rounded-2xl shadow-2xl max-h-80 overflow-y-auto">
-                    {filteredProducts.map((product, index) => (
-                      <div key={product.id} onClick={() => selectProduct(product)} className={`px-6 py-3 cursor-pointer transition-colors ${index === selectedIndex ? 'bg-purple-100 border-l-4 border-purple-500' : 'hover:bg-gray-50'} ${index !== filteredProducts.length - 1 ? 'border-b border-gray-200' : ''}`}>
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <p className="font-semibold text-gray-900">{product.name}</p>
-                            <p className="text-xs text-gray-500 mt-1">SKU: {product.sku} {product.barcode && `• Barcode: ${product.barcode}`}</p>
-                          </div>
-                          <div className="ml-4 text-right">
-                            <p className="font-bold text-purple-600">Rs {parseFloat(product.selling_price || 0).toFixed(2)}</p>
-                            <p className="text-xs text-gray-500">Stock: {product.inventory?.[0]?.quantity || 0}</p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <select value={selectedStore?.id} onChange={(e) => setSelectedStore(stores.find(s => s.id === parseInt(e.target.value)))} className="px-6 py-3 bg-white border border-gray-300 rounded-full text-sm focus:outline-none focus:border-purple-400">
-                {stores.map(store => <option key={store.id} value={store.id}>{store.name}</option>)}
-              </select>
-              <select value={selectedCustomer?.id || ''} onChange={(e) => setSelectedCustomer(customers.find(c => c.id === e.target.value))} className="px-6 py-3 bg-white border border-gray-300 rounded-full text-sm focus:outline-none focus:border-purple-400">
-                <option value="">Customer</option>
-                {customers.map(customer => <option key={customer.id} value={customer.id}>{customer.first_name} {customer.last_name}</option>)}
-              </select>
-            </div>
-            <div className="bg-gray-50 rounded-3xl p-5 mb-6">
-              <div className="grid grid-cols-12 gap-2 mb-3 px-2">
-                <div className="col-span-1 text-xs font-medium text-gray-600">Code</div>
-                <div className="col-span-3 text-xs font-medium text-gray-600">Item</div>
-                <div className="col-span-2 text-xs font-medium text-gray-600">Batch No.</div>
-                <div className="col-span-1 text-xs font-medium text-gray-600 text-right">Price</div>
-                <div className="col-span-1 text-xs font-medium text-gray-600 text-center">Qty</div>
-                <div className="col-span-1 text-xs font-medium text-gray-600 text-right">Dis%</div>
-                <div className="col-span-1 text-xs font-medium text-gray-600 text-right">Dis Val</div>
-                <div className="col-span-2 text-xs font-medium text-gray-600 text-right">Net Value</div>
-              </div>
-              <div className="bg-white rounded-2xl min-h-[250px] max-h-[250px] overflow-y-auto p-3">
-                {orderItems.length === 0 ? (
-                  <div className="flex items-center justify-center h-full text-gray-400 text-sm">Start typing to search and add items...</div>
-                ) : (
-                  <div className="space-y-1">
-                    {orderItems.map((item, index) => (
-                      <div key={index} onClick={() => setSelectedRow(index)} className={`grid grid-cols-12 gap-2 px-2 py-2 rounded-lg cursor-pointer transition-colors ${selectedRow === index ? 'bg-purple-100 border-2 border-purple-400' : 'hover:bg-gray-50'}`}>
-                        <div className="col-span-1 text-sm text-gray-700">{item.code}</div>
-                        <div className="col-span-3 text-sm text-gray-700 truncate" title={item.name}>{item.name}</div>
-                        <input type="text" value={item.batch_no} onChange={(e) => updateItem(index, 'batch_no', e.target.value)} className="col-span-2 text-sm px-2 bg-transparent focus:outline-none focus:bg-white focus:border focus:border-purple-300 rounded" placeholder="-" />
-                        <input type="number" value={item.unit_price} onChange={(e) => updateItem(index, 'unit_price', parseFloat(e.target.value) || 0)} className="col-span-1 text-sm text-right px-2 bg-transparent focus:outline-none focus:bg-white focus:border focus:border-purple-300 rounded" step="0.01" />
-                        <input type="number" value={item.quantity} onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 1)} className="col-span-1 text-sm text-center px-2 bg-transparent focus:outline-none focus:bg-white focus:border focus:border-purple-300 rounded" min="1" />
-                        <input type="number" value={item.discount_percentage} onChange={(e) => updateItem(index, 'discount_percentage', parseFloat(e.target.value) || 0)} className="col-span-1 text-sm text-right px-2 bg-transparent focus:outline-none focus:bg-white focus:border focus:border-purple-300 rounded" step="0.01" />
-                        <div className="col-span-1 text-sm text-right text-red-600 font-medium px-2">{item.discount_value.toFixed(2)}</div>
-                        <div className="col-span-2 text-sm text-right font-semibold px-2">Rs {item.line_total.toFixed(2)}</div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-6 mb-6">
-              <div className="space-y-3">
-                <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description" className="w-full px-6 py-3 bg-white border border-gray-300 rounded-2xl text-sm focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-200 resize-none" rows="3" />
-                <select value={selectedStaff?.id || ''} onChange={(e) => setSelectedStaff(staff.find(s => s.id === e.target.value))} className="w-full px-6 py-3 bg-white border border-gray-300 rounded-full text-sm focus:outline-none focus:border-purple-400">
-                  <option value="">Employee</option>
-                  {staff.map(employee => <option key={employee.id} value={employee.id}>{employee.first_name} {employee.last_name}</option>)}
-                </select>
-              </div>
-              <div className="space-y-3">
-                <div className="px-6 py-3 bg-white border border-gray-300 rounded-full flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Total Value</span>
-                  <span className="text-base font-semibold text-gray-800">Rs {totals.subtotal.toFixed(2)}</span>
-                </div>
-                <div className="px-6 py-3 bg-white border border-gray-300 rounded-full flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Item Discount</span>
-                  <span className="text-base font-semibold text-red-600">Rs {totals.totalDiscount.toFixed(2)}</span>
-                </div>
-                <div className="px-6 py-3 bg-white border border-gray-300 rounded-full flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Net Total</span>
-                  <span className="text-lg font-bold text-gray-900">Rs {totals.netTotal.toFixed(2)}</span>
-                </div>
-              </div>
-            </div>
-            <div className="grid grid-cols-5 gap-3">
-              <button onClick={handleExit} className="py-4 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-full font-medium text-sm shadow-md hover:shadow-lg hover:from-red-600 hover:to-red-700 transition-all">&lt; Esc &gt; Exit</button>
-              <button onClick={handleSave} className="py-4 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-full font-medium text-sm shadow-md hover:shadow-lg hover:from-green-600 hover:to-green-700 transition-all">&lt; F8 &gt; Save</button>
-              <button onClick={handleDelete} className="py-4 bg-gradient-to-r from-yellow-400 to-orange-500 text-white rounded-full font-medium text-sm shadow-md hover:shadow-lg hover:from-yellow-500 hover:to-orange-600 transition-all">&lt; F9 &gt; Delete</button>
-              <button onClick={handleCancel} className="py-4 bg-white border-2 border-gray-300 text-gray-700 rounded-full font-medium text-sm hover:bg-gray-50 transition-all">&lt; F12 &gt; Cancel</button>
-              <button onClick={handlePrint} className="py-4 bg-gradient-to-r from-purple-400 to-pink-500 text-white rounded-full font-medium text-sm shadow-md hover:shadow-lg hover:from-purple-500 hover:to-pink-600 transition-all">&lt; F2 &gt; Print</button>
-            </div>
+          </div>
+
+          <div className="flex gap-4 justify-center">
+            <button onClick={() => window.history.back()} className="px-8 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-medium">&lt; Esc &gt; Exit</button>
+            <button onClick={handleSave} disabled={loading} className="px-8 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-medium disabled:bg-gray-400">{loading ? 'Saving...' : '< F8 > Save'}</button>
+            <button onClick={resetForm} className="px-8 py-3 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition-colors font-medium">&lt; F9 &gt; Delete</button>
+            <button onClick={resetForm} className="px-8 py-3 bg-gray-400 text-white rounded-lg hover:bg-gray-500 transition-colors font-medium">&lt; F12 &gt; Cancel</button>
+            <button className="px-8 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors font-medium">&lt; F2 &gt; Print</button>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
