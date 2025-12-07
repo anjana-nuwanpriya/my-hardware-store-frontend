@@ -63,12 +63,8 @@ export default function EnhancedNavigation() {
 
   const isActive = (path) => pathname === path;
 
-  // Masters Section - Item Details added before Employee
-    const mastersItems = [
-    // REMOVED: Dashboard
-    // REMOVED: Point of Sale
-    // REMOVED: Inventory
-
+  // Masters Section
+  const mastersItems = [
     { name: 'Supplier', path: '/suppliers', icon: Users },
     { name: 'Customer', path: '/customers', icon: Users },
     { name: 'Stores', path: '/stores', icon: Store },
@@ -77,25 +73,33 @@ export default function EnhancedNavigation() {
     { name: 'Employee', path: '/employees', icon: UserCog },
   ];
 
-
-  // Transaction Section
+  // Transaction Section - COMPLETE WITH ALL NEW MODULES
   const transactionItems = [
+    // Opening Balances
     { name: 'Supplier OP Balance', path: '/supplier-op-balance', icon: Banknote },
     { name: 'Customer OP Balance', path: '/customer-op-balance', icon: Wallet },
+    
+    // Inventory
     { name: 'Opening Stock Entry', path: '/opening-stock', icon: BoxIcon },
-    { name: 'Wholesale Sales', path: '/wholesale', icon: ShoppingBag },
-    { name: 'Quotation', path: '/quotation', icon: FileEdit },
-    { name: 'Item Dispatch Note', path: '/dispatch-note', icon: FileOutput },
+    { name: 'Stock Adjustment', path: '/stock-adjustment', icon: ArrowDownUp },
+    { name: 'Item Dispatch Note', path: '/item-dispatch-note', icon: FileOutput },
+    
+    // Purchase Flow
     { name: 'Purchase Order', path: '/purchase-orders', icon: ClipboardList },
     { name: 'Purchase(GRN)', path: '/purchase-grn', icon: BoxIcon },
     { name: 'Purchase Return', path: '/purchase-return', icon: RotateCcw },
     { name: 'Supplier Payments', path: '/supplier-payments', icon: CreditCard },
-    { name: 'Sales', path: '/sales', icon: TrendingUp },
-    { name: 'Sales Return', path: '/returns', icon: RotateCcw },
-    { name: 'Sales Return (Whole Sales)', path: '/sales-return-whole', icon: RotateCcw },
-    { name: 'Stock Adjustment', path: '/stock-adjustment', icon: ArrowDownUp },
-    { name: 'Customer Payment', path: '/customer-payment', icon: CreditCard },
-    { name: 'Petty Cash Voucher', path: '/petty-cash', icon: Wallet },
+    
+    // Sales Flow
+    { name: 'Quotation', path: '/quotations', icon: FileEdit },
+    { name: 'Sales (Retail)', path: '/sales', icon: TrendingUp },
+    { name: 'Sales (Wholesale)', path: '/wholesale', icon: ShoppingBag },
+    { name: 'Sales Return', path: '/sales-return', icon: RotateCcw },
+    { name: 'Sales Return (Wholesale)', path: '/sales-wholesale-return', icon: RotateCcw },
+    { name: 'Customer Payment', path: '/customer-payments', icon: CreditCard },
+    
+    // Financial
+    { name: 'Petty Cash Voucher', path: '/petty-cash-voucher', icon: Wallet },
     { name: 'General Receipts', path: '/general-receipts', icon: Receipt },
     { name: 'Bank Entries', path: '/bank-entries', icon: Banknote },
   ];
